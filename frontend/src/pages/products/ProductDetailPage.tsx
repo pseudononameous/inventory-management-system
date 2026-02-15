@@ -1,0 +1,170 @@
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Title,
+  Paper,
+  Stack,
+  Group,
+  Text,
+  Table,
+  Button,
+  Badge,
+  Box,
+  Loader,
+  ActionIcon,
+  SimpleGrid,
+} from "@mantine/core";
+import { useMantineTheme } from "@mantine/core";
+import { IconArrowLeft, IconPencil } from "@tabler/icons-react";
+import { productsApi, type Product, type Stock } from "@services/api";
+
+function Details({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <Stack gap={2}>
+      <Text size="xs" c="dimmed" fw={500}>{label}</Text>
+      <Text size="sm">{value ?? "—"}</Text>
+    </Stack>
+  );
+}
+
+export default function ProductDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const theme = useMantineTheme();
+  const productId = id ? parseInt(id, 10) : NaN;
+
+  const { data: product, isLoading: productLoading } = useQuery({
+    queryKey: ["product", productId],
+    queryFn: async () => {
+      const res = await productsApi.get(productId);
+      return res.data.data as Product;
+    },
+    enabled: Number.isInteger(productId),
+  });
+
+  const { data: stocks = [], isLoading: stocksLoading } = useQuery({
+    queryKey: ["product-stocks", productId],
+    queryFn: async () => {
+      const res = await productsApi.getStocks(productId);
+      return (res.data.data ?? []) as Stock[];
+    },
+    enabled: Number.isInteger(productId),
+  });
+
+  if (productLoading || !product) {
+    return (
+      <Box py="xl" style={{ display: "flex", justifyContent: "center" }}>
+        <Loader size="md" />
+      </Box>
+    );
+  }
+
+  const criticalLevel = product.critical_level != null ? Number(product.critical_level) : null;
+  const availableQty = product.available_quantity != null ? Number(product.available_quantity) : null;
+  const isLow = criticalLevel != null && availableQty != null && availableQty <= criticalLevel;
+
+  return (
+    <Stack gap="xl" p="xs">
+      <Button
+        variant="subtle"
+        leftSection={<IconArrowLeft size={16} />}
+        onClick={() => navigate("/products")}
+        style={{ alignSelf: "flex-start" }}
+      >
+        Back
+      </Button>
+
+      <Paper
+        p="lg"
+        radius="lg"
+        shadow="sm"
+        style={{ backgroundColor: theme.colors.primary?.[0] ?? theme.colors.blue[0] }}
+      >
+        <Stack gap="lg">
+          <Group justify="space-between" align="flex-end">
+            <Group gap="xs">
+              <ActionIcon variant="subtle" radius="md" size="md" aria-label="Edit product">
+                <IconPencil size={16} />
+              </ActionIcon>
+              <Title order={3} c={theme.colors.primary?.[9] ?? theme.colors.blue[9]}>
+                {product.name}
+              </Title>
+              {isLow && <Badge color="red" variant="light" size="sm">Low stock</Badge>}
+            </Group>
+            <Group>
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => window.open(`/products/${id}/stock-card`, "_blank")}
+              >
+                Stock Card
+              </Button>
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => window.open(`/products/${id}/bin-card`, "_blank")}
+              >
+                Bin Card
+              </Button>
+            </Group>
+          </Group>
+          {product.description && (
+            <Box>
+              <Details label="Description" value={product.description} />
+            </Box>
+          )}
+          <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }} spacing="md">
+            <Details label="Product Code" value={product.product_code} />
+            <Details label="Category" value={product.category?.name} />
+            <Details
+              label="On-hand Quantity"
+              value={availableQty != null && product.unit?.name ? `${availableQty} ${product.unit.name}` : null}
+            />
+            <Details label="Critical Level" value={criticalLevel} />
+            <Details label="Fund Cluster" value={product.fund_cluster?.name} />
+            <Details label="Unit" value={product.unit?.name} />
+          </SimpleGrid>
+        </Stack>
+      </Paper>
+
+      <div>
+        <Title order={4} mb={4}>Stocks</Title>
+        <Text size="sm" c="dimmed">Stock batches and running balance</Text>
+      </div>
+      <Paper withBorder radius="lg" style={{ boxShadow: "0 1px 3px rgba(15,23,42,0.04)" }}>
+        {stocksLoading ? (
+          <Box p="xl" style={{ display: "flex", justifyContent: "center" }}>
+            <Loader size="sm" />
+          </Box>
+        ) : stocks.length === 0 ? (
+          <Text p="lg" c="dimmed">No stock records.</Text>
+        ) : (
+          <Table striped highlightOnHover withTableBorder>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>ID</Table.Th>
+                <Table.Th>Brand</Table.Th>
+                <Table.Th>Lot No</Table.Th>
+                <Table.Th>Running Balance</Table.Th>
+                <Table.Th>Unit Price</Table.Th>
+                <Table.Th>Expiry Date</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {stocks.map((s) => (
+                <Table.Tr key={s.id}>
+                  <Table.Td>{s.id}</Table.Td>
+                  <Table.Td>{s.brand?.name ?? "—"}</Table.Td>
+                  <Table.Td>{s.lot_no ?? "—"}</Table.Td>
+                  <Table.Td>{s.running_balance}</Table.Td>
+                  <Table.Td>{s.unit_price != null ? s.unit_price : "—"}</Table.Td>
+                  <Table.Td>{s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : "—"}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+      </Paper>
+    </Stack>
+  );
+}
