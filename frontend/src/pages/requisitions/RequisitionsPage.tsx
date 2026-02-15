@@ -1,4 +1,3 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
 import {
@@ -22,12 +21,13 @@ import { IconPlus, IconEdit, IconTrash, IconEye } from "@tabler/icons-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FilterInput, FilterSelect } from "@components/filters";
 import type { SelectOptionType } from "@components/filters";
-import {
-  requisitionsApi,
-  departmentsApi,
-  type Requisition,
-} from "@services/api";
 import { notifications } from "@mantine/notifications";
+import { useRequisitionsQuery } from "@hooks/queries/requisitions/useRequisitionsQuery";
+import { useRequisitionMutation } from "@hooks/mutations/requisitions/useRequisitionMutation";
+import { useLibraryListQuery } from "@hooks/queries/libraries/useLibraryListQuery";
+import { departmentsApi } from "@api/libraries";
+import type { Requisition } from "@api/requisitions";
+import { requisitionPayloadSchema } from "@schemas/requisition";
 
 const initialForm = {
   ris_no: "",
@@ -56,86 +56,22 @@ export default function RequisitionsPage() {
   const [debouncedRisNo] = useDebouncedValue(risNo, 300);
   const [debouncedRequestedBy] = useDebouncedValue(requestedBy, 300);
   const [debouncedDesignation] = useDebouncedValue(designation, 300);
-  const queryClient = useQueryClient();
 
   const isForDispenseParam = tab === "pending" ? 0 : tab === "for-dispensing" ? 1 : undefined;
   const isDispenseParam = tab === "dispensed" ? 1 : undefined;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["requisitions", tab, isForDispenseParam, isDispenseParam, debouncedRisNo, departmentId, debouncedRequestedBy, debouncedDesignation],
-    queryFn: async () => {
-      const res = await requisitionsApi.list({
-        pageSize: 100,
-        ...(isForDispenseParam !== undefined && { is_for_dispense: isForDispenseParam }),
-        ...(isDispenseParam !== undefined && { is_dispense: isDispenseParam }),
-        ris_no: debouncedRisNo || undefined,
-        department_id: departmentId ? Number(departmentId) : undefined,
-        requested_by: debouncedRequestedBy || undefined,
-        designation: debouncedDesignation || undefined,
-      });
-      return (res.data.data ?? []) as Requisition[];
-    },
+  const { data, isLoading } = useRequisitionsQuery({
+    pageSize: 100,
+    ...(isForDispenseParam !== undefined && { is_for_dispense: isForDispenseParam }),
+    ...(isDispenseParam !== undefined && { is_dispense: isDispenseParam }),
+    ris_no: debouncedRisNo || undefined,
+    department_id: departmentId ? Number(departmentId) : undefined,
+    requested_by: debouncedRequestedBy || undefined,
+    designation: debouncedDesignation || undefined,
   });
 
-  const { data: departments = [] } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => {
-      const res = await departmentsApi.list({ pageSize: 200 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (payload: typeof initialForm) =>
-      requisitionsApi.create({
-        ris_no: payload.ris_no,
-        department_id: payload.department_id,
-        requested_by: payload.requested_by,
-        designation: payload.designation,
-        purpose: (payload.purpose ?? "").toString(),
-        with_inspection: payload.with_inspection,
-      }),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
-      setOpened(false);
-      setForm(initialForm);
-      notifications.show({ title: "Created", message: "Requisition created.", color: "green" });
-      const created = res?.data?.data as Requisition | undefined;
-      if (created?.id) navigate(`/requisitions/${created.id}`);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: number;
-      payload: {
-        ris_no: string;
-        department_id: number;
-        requested_by: string;
-        designation: string;
-        purpose?: string;
-        with_inspection: boolean;
-      };
-    }) => requisitionsApi.update(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
-      setEditingId(null);
-      setOpened(false);
-      setForm(initialForm);
-      notifications.show({ title: "Updated", message: "Requisition updated.", color: "green" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => requisitionsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
-      notifications.show({ title: "Deleted", message: "Requisition deleted.", color: "green" });
-    },
-  });
+  const { data: departments = [] } = useLibraryListQuery("departments", departmentsApi, { pageSize: 200 });
+  const { create, update, remove } = useRequisitionMutation();
 
   const openCreate = () => {
     setEditingId(null);
@@ -157,31 +93,36 @@ export default function RequisitionsPage() {
   };
 
   const handleSave = () => {
-    if (
-      !form.ris_no.trim() ||
-      !form.department_id ||
-      !form.requested_by.trim() ||
-      !form.designation.trim()
-    ) {
-      notifications.show({
-        title: "Validation",
-        message: "RIS No, Department, Requested by and Designation are required.",
-        color: "red",
-      });
-      return;
-    }
-    const payload = {
+    const parsed = requisitionPayloadSchema.safeParse({
+      ...form,
       ris_no: form.ris_no.trim(),
-      department_id: form.department_id,
       requested_by: form.requested_by.trim(),
       designation: form.designation.trim(),
-      purpose: form.purpose.trim(),
-      with_inspection: form.with_inspection,
-    };
+      purpose: form.purpose?.trim() ?? "",
+    });
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? "Invalid form";
+      notifications.show({ title: "Validation", message: msg, color: "red" });
+      return;
+    }
+    const payload = { ...parsed.data, purpose: parsed.data.purpose ?? "" };
     if (editingId !== null) {
-      updateMutation.mutate({ id: editingId, payload });
+      update.mutate(
+        { id: editingId, payload },
+        { onSettled: () => { setOpened(false); setEditingId(null); setForm(initialForm); } }
+      );
     } else {
-      createMutation.mutate(payload);
+      create.mutate(
+        payload,
+        {
+          onSuccess: (res) => {
+            setOpened(false);
+            setForm(initialForm);
+            const created = res?.data?.data as Requisition | undefined;
+            if (created?.id) navigate(`/requisitions/${created.id}`);
+          },
+        }
+      );
     }
   };
 
@@ -267,22 +208,13 @@ export default function RequisitionsPage() {
                   <Table.Td>{r.with_inspection ? "Yes" : "No"}</Table.Td>
                   <Table.Td>
                     <Group gap="xs">
-                      <ActionIcon
-                        variant="subtle"
-                        component={Link}
-                        to={`/requisitions/${r.id}`}
-                        title="View / Items"
-                      >
+                      <ActionIcon variant="subtle" component={Link} to={`/requisitions/${r.id}`} title="View / Items">
                         <IconEye size={16} />
                       </ActionIcon>
                       <ActionIcon variant="subtle" onClick={() => openEdit(r)}>
                         <IconEdit size={16} />
                       </ActionIcon>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => deleteMutation.mutate(r.id)}
-                      >
+                      <ActionIcon color="red" variant="subtle" onClick={() => remove.mutate(r.id)}>
                         <IconTrash size={16} />
                       </ActionIcon>
                     </Group>
@@ -296,11 +228,7 @@ export default function RequisitionsPage() {
 
       <Modal
         opened={opened}
-        onClose={() => {
-          setOpened(false);
-          setEditingId(null);
-          setForm(initialForm);
-        }}
+        onClose={() => { setOpened(false); setEditingId(null); setForm(initialForm); }}
         title={editingId ? "Edit Requisition" : "New Requisition"}
         size="md"
         radius="lg"
@@ -345,14 +273,9 @@ export default function RequisitionsPage() {
           <Switch
             label="With inspection"
             checked={form.with_inspection}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, with_inspection: e.currentTarget.checked }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, with_inspection: e.currentTarget.checked }))}
           />
-          <Button
-            onClick={handleSave}
-            loading={createMutation.isPending || updateMutation.isPending}
-          >
+          <Button onClick={handleSave} loading={create.isPending || update.isPending}>
             {editingId ? "Update" : "Create"}
           </Button>
         </Stack>

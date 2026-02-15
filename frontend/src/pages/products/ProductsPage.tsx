@@ -1,4 +1,3 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
 import {
@@ -23,25 +22,32 @@ import { IconPlus, IconEdit, IconTrash, IconEye } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { FilterInput, FilterSelect } from "@components/filters";
 import type { SelectOptionType } from "@components/filters";
-import {
-  productsApi,
-  unitsApi,
-  categoriesApi,
-  fundClustersApi,
-  genericNamesApi,
-  type Product,
-  type ProductPayload,
-} from "@services/api";
 import { notifications } from "@mantine/notifications";
+import { useProductsQuery } from "@hooks/queries/products/useProductsQuery";
+import { useProductMutation } from "@hooks/mutations/products/useProductMutation";
+import { useLibraryListQuery } from "@hooks/queries/libraries/useLibraryListQuery";
+import { unitsApi, categoriesApi, fundClustersApi, genericNamesApi } from "@api/libraries";
+import type { Product, ProductPayload } from "@api/products";
+import { productPayloadSchema } from "@schemas/product";
 
 const PAGE_SIZE = 10;
+
+const initialForm: ProductPayload = {
+  name: "",
+  description: "",
+  unit_id: 0,
+  category_id: 0,
+  fund_cluster_id: 0,
+  generic_name_id: null,
+  critical_level: null,
+};
 
 export default function ProductsPage() {
   const [opened, setOpened] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [name, setName] = useState("");
-  const [description, setDescription] = useState(""); // used in debouncedDescription for API filter
+  const [description, setDescription] = useState("");
   const [productCode, setProductCode] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [fundClusterId] = useState<string | null>(null);
@@ -49,110 +55,28 @@ export default function ProductsPage() {
   const [debouncedName] = useDebouncedValue(name, 300);
   const [debouncedDescription] = useDebouncedValue(description, 300);
   const [debouncedProductCode] = useDebouncedValue(productCode, 300);
+  const [form, setForm] = useState<ProductPayload>(initialForm);
 
-  const [form, setForm] = useState<ProductPayload>({
-    name: "",
-    description: "",
-    unit_id: 0,
-    category_id: 0,
-    fund_cluster_id: 0,
-    generic_name_id: null,
-    critical_level: null,
-  });
-  const queryClient = useQueryClient();
-
-  const { data: listResponse, isLoading } = useQuery({
-    queryKey: ["products", page, debouncedName, debouncedDescription, debouncedProductCode, categoryId, fundClusterId, genericNameId],
-    queryFn: async () => {
-      const res = await productsApi.list({
-        page,
-        pageSize: PAGE_SIZE,
-        name: debouncedName || undefined,
-        description: debouncedDescription || undefined,
-        product_code: debouncedProductCode || undefined,
-        category_id: categoryId ? Number(categoryId) : undefined,
-        fund_cluster_id: fundClusterId ? Number(fundClusterId) : undefined,
-        generic_name_id: genericNameId ? Number(genericNameId) : undefined,
-      });
-      return {
-        data: (res.data.data ?? []) as Product[],
-        meta: res.data.meta as { current_page: number; last_page: number; per_page: number; total: number } | undefined,
-      };
-    },
+  const { data: listResponse, isLoading } = useProductsQuery({
+    page,
+    pageSize: PAGE_SIZE,
+    name: debouncedName || undefined,
+    description: debouncedDescription || undefined,
+    product_code: debouncedProductCode || undefined,
+    category_id: categoryId ? Number(categoryId) : undefined,
+    fund_cluster_id: fundClusterId ? Number(fundClusterId) : undefined,
+    generic_name_id: genericNameId ? Number(genericNameId) : undefined,
   });
 
-  const { data: units = [] } = useQuery({
-    queryKey: ["units"],
-    queryFn: async () => {
-      const res = await unitsApi.list({ pageSize: 200 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
+  const { data: units = [] } = useLibraryListQuery("units", unitsApi, { pageSize: 200 });
+  const { data: categories = [] } = useLibraryListQuery("categories", categoriesApi, { pageSize: 200 });
+  const { data: fundClusters = [] } = useLibraryListQuery("fund-clusters", fundClustersApi, { pageSize: 200 });
+  const { data: genericNames = [] } = useLibraryListQuery("generic-names", genericNamesApi, { pageSize: 200 });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const res = await categoriesApi.list({ pageSize: 200 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
-
-  const { data: fundClusters = [] } = useQuery({
-    queryKey: ["fund-clusters"],
-    queryFn: async () => {
-      const res = await fundClustersApi.list({ pageSize: 200 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
-
-  const { data: genericNames = [] } = useQuery({
-    queryKey: ["generic-names"],
-    queryFn: async () => {
-      const res = await genericNamesApi.list({ pageSize: 200 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (payload: ProductPayload) => productsApi.create(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      setOpened(false);
-      resetForm();
-      notifications.show({ title: "Created", message: "Product created.", color: "green" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: Partial<ProductPayload> }) =>
-      productsApi.update(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      setEditingId(null);
-      setOpened(false);
-      resetForm();
-      notifications.show({ title: "Updated", message: "Product updated.", color: "green" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => productsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      notifications.show({ title: "Deleted", message: "Product deleted.", color: "green" });
-    },
-  });
+  const { create, update, remove } = useProductMutation();
 
   function resetForm() {
-    setForm({
-      name: "",
-      description: "",
-      unit_id: 0,
-      category_id: 0,
-      fund_cluster_id: 0,
-      generic_name_id: null,
-      critical_level: null,
-    });
+    setForm(initialForm);
   }
 
   const openCreate = () => {
@@ -176,11 +100,7 @@ export default function ProductsPage() {
   };
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.unit_id || !form.category_id || !form.fund_cluster_id) {
-      notifications.show({ title: "Validation", message: "Name, Unit, Category and Fund Cluster are required.", color: "red" });
-      return;
-    }
-    const payload: ProductPayload = {
+    const parsed = productPayloadSchema.safeParse({
       name: form.name.trim(),
       description: form.description?.trim() || null,
       unit_id: form.unit_id,
@@ -188,18 +108,23 @@ export default function ProductsPage() {
       fund_cluster_id: form.fund_cluster_id,
       generic_name_id: form.generic_name_id || null,
       critical_level: form.critical_level ?? null,
-    };
+    });
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? "Invalid form";
+      notifications.show({ title: "Validation", message: msg, color: "red" });
+      return;
+    }
+    const payload: ProductPayload = { ...parsed.data };
     if (editingId !== null) {
-      updateMutation.mutate({ id: editingId, payload });
+      update.mutate({ id: editingId, payload }, { onSettled: () => { setOpened(false); setEditingId(null); resetForm(); } });
     } else {
-      createMutation.mutate(payload);
+      create.mutate(payload, { onSettled: () => { setOpened(false); resetForm(); } });
     }
   };
 
   const products = listResponse?.data ?? [];
   const meta = listResponse?.meta;
   const totalPages = meta?.last_page ?? 1;
-
   const categoriesOpts: SelectOptionType[] = categories.map((c) => ({ value: String(c.id), label: c.name }));
 
   return (
@@ -261,22 +186,13 @@ export default function ProductsPage() {
                   <Table.Td>{p.critical_level != null ? p.critical_level : "—"}</Table.Td>
                   <Table.Td>
                     <Group gap="xs">
-                      <ActionIcon
-                        variant="subtle"
-                        component={Link}
-                        to={`/products/${p.id}`}
-                        title="View / Stocks"
-                      >
+                      <ActionIcon variant="subtle" component={Link} to={`/products/${p.id}`} title="View / Stocks">
                         <IconEye size={16} />
                       </ActionIcon>
                       <ActionIcon variant="subtle" onClick={() => openEdit(p)}>
                         <IconEdit size={16} />
                       </ActionIcon>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => deleteMutation.mutate(p.id)}
-                      >
+                      <ActionIcon color="red" variant="subtle" onClick={() => remove.mutate(p.id)}>
                         <IconTrash size={16} />
                       </ActionIcon>
                     </Group>
@@ -354,7 +270,7 @@ export default function ProductsPage() {
             onChange={(v) => setForm((f) => ({ ...f, critical_level: typeof v === "number" ? v : null }))}
             placeholder="Optional"
           />
-          <Button onClick={handleSave} loading={createMutation.isPending || updateMutation.isPending}>
+          <Button onClick={handleSave} loading={create.isPending || update.isPending}>
             {editingId ? "Update" : "Create"}
           </Button>
         </Stack>

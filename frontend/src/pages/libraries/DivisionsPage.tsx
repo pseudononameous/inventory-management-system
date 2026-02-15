@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { divisionsApi } from "@services/api";
+import { divisionsApi } from "@api/libraries";
 
 export default function DivisionsPage() {
   return (

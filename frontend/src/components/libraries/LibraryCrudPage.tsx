@@ -1,4 +1,3 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Title,
@@ -14,11 +13,13 @@ import {
 } from "@mantine/core";
 import { IconPlus, IconEdit, IconTrash } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
+import { useLibraryListQuery } from "@hooks/queries/libraries/useLibraryListQuery";
+import { useLibraryMutation } from "@hooks/mutations/libraries/useLibraryMutation";
+import type { LibraryRecord } from "@api/libraries";
+import { libraryNameSchema } from "@schemas/library";
 
-type LibraryApi = {
-  list: (params?: { name?: string; pageSize?: number }) => Promise<{
-    data: { data: { id: number; name: string }[] };
-  }>;
+export type LibraryApi = {
+  list: (params?: { name?: string; pageSize?: number }) => Promise<{ data: { data: LibraryRecord[] } }>;
   create: (payload: { name: string }) => Promise<unknown>;
   update: (id: number, payload: { name: string }) => Promise<unknown>;
   delete: (id: number) => Promise<unknown>;
@@ -34,44 +35,9 @@ export default function LibraryCrudPage({ title, api, queryKey }: LibraryCrudPag
   const [opened, setOpened] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
-  const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: [queryKey],
-    queryFn: async () => {
-      const res = await api.list({ pageSize: 100 });
-      return (res.data.data ?? []) as { id: number; name: string }[];
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (payload: { name: string }) => api.create(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
-      setOpened(false);
-      setName("");
-      notifications.show({ title: "Created", message: `${title.slice(0, -1)} created.`, color: "green" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, name: n }: { id: number; name: string }) => api.update(id, { name: n }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
-      setEditingId(null);
-      setName("");
-      setOpened(false);
-      notifications.show({ title: "Updated", message: `${title.slice(0, -1)} updated.`, color: "green" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
-      notifications.show({ title: "Deleted", message: `${title.slice(0, -1)} deleted.`, color: "green" });
-    },
-  });
+  const { data = [], isLoading } = useLibraryListQuery(queryKey, api, { pageSize: 100 });
+  const { create, update, remove } = useLibraryMutation(queryKey, api, title);
 
   const openCreate = () => {
     setEditingId(null);
@@ -79,22 +45,32 @@ export default function LibraryCrudPage({ title, api, queryKey }: LibraryCrudPag
     setOpened(true);
   };
 
-  const openEdit = (row: { id: number; name: string }) => {
+  const openEdit = (row: LibraryRecord) => {
     setEditingId(row.id);
     setName(row.name);
     setOpened(true);
   };
 
   const handleSave = () => {
-    if (!name.trim()) return;
+    const parsed = libraryNameSchema.safeParse({ name: name.trim() });
+    if (!parsed.success) {
+      notifications.show({ title: "Validation", message: parsed.error.issues[0]?.message ?? "Name is required", color: "red" });
+      return;
+    }
     if (editingId !== null) {
-      updateMutation.mutate({ id: editingId, name: name.trim() });
+      update.mutate(
+        { id: editingId, name: parsed.data.name },
+        { onSettled: () => { setOpened(false); setEditingId(null); setName(""); } }
+      );
     } else {
-      createMutation.mutate({ name: name.trim() });
+      create.mutate(
+        { name: parsed.data.name },
+        { onSettled: () => { setOpened(false); setName(""); } }
+      );
     }
   };
 
-  const rows = (data ?? []) as { id: number; name: string }[];
+  const rows = data as LibraryRecord[];
 
   return (
     <Stack gap="xl">
@@ -129,11 +105,7 @@ export default function LibraryCrudPage({ title, api, queryKey }: LibraryCrudPag
                       <ActionIcon variant="subtle" onClick={() => openEdit(row)}>
                         <IconEdit size={16} />
                       </ActionIcon>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => deleteMutation.mutate(row.id)}
-                      >
+                      <ActionIcon color="red" variant="subtle" onClick={() => remove.mutate(row.id)}>
                         <IconTrash size={16} />
                       </ActionIcon>
                     </Group>
@@ -146,11 +118,7 @@ export default function LibraryCrudPage({ title, api, queryKey }: LibraryCrudPag
 
       <Modal
         opened={opened}
-        onClose={() => {
-          setOpened(false);
-          setEditingId(null);
-          setName("");
-        }}
+        onClose={() => { setOpened(false); setEditingId(null); setName(""); }}
         title={editingId ? `Edit ${title.slice(0, -1)}` : `New ${title.slice(0, -1)}`}
         radius="lg"
       >
@@ -161,10 +129,7 @@ export default function LibraryCrudPage({ title, api, queryKey }: LibraryCrudPag
             onChange={(e) => setName(e.target.value)}
             placeholder={`e.g. ${title.slice(0, -1)} name`}
           />
-          <Button
-            onClick={handleSave}
-            loading={createMutation.isPending || updateMutation.isPending}
-          >
+          <Button onClick={handleSave} loading={create.isPending || update.isPending}>
             {editingId ? "Update" : "Create"}
           </Button>
         </Stack>

@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { suppliersApi } from "@services/api";
+import { suppliersApi } from "@api/libraries";
 
 export default function SuppliersPage() {
   return (

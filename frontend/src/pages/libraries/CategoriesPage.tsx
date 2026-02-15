@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { categoriesApi } from "@services/api";
+import { categoriesApi } from "@api/libraries";
 
 export default function CategoriesPage() {
   return (

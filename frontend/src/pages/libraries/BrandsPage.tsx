@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { brandsApi } from "@services/api";
+import { brandsApi } from "@api/libraries";
 
 export default function BrandsPage() {
   return (

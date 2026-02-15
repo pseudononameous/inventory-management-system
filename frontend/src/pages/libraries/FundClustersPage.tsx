@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { fundClustersApi } from "@services/api";
+import { fundClustersApi } from "@api/libraries";
 
 export default function FundClustersPage() {
   return (

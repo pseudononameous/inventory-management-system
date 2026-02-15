@@ -1,5 +1,5 @@
 import LibraryCrudPage from "@components/libraries/LibraryCrudPage";
-import { genericNamesApi } from "@services/api";
+import { genericNamesApi } from "@api/libraries";
 
 export default function GenericNamesPage() {
   return (
