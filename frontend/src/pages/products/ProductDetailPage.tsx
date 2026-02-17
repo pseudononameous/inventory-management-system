@@ -1,28 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Title,
-  Paper,
-  Stack,
-  Group,
-  Text,
-  Table,
-  Button,
-  Badge,
-  Box,
-  Loader,
-  ActionIcon,
-  SimpleGrid,
-} from "@mantine/core";
-import { useMantineTheme } from "@mantine/core";
+import { Title, Paper, Stack, Group, Text, Table, Button, Badge, Box, Loader, ActionIcon, SimpleGrid } from "@mantine/core";
 import { IconArrowLeft, IconPencil } from "@tabler/icons-react";
 import { productsApi, type Product, type Stock } from "@services/api";
 
 function Details({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
-    <Stack gap={2}>
-      <Text size="xs" c="dimmed" fw={500}>{label}</Text>
-      <Text size="sm">{value ?? "—"}</Text>
+    <Stack gap={4}>
+      <Text size="xs" c="dimmed" fw={600}>{label}</Text>
+      <Text size="sm" fw={500}>{value ?? "—"}</Text>
     </Stack>
   );
 }
@@ -30,7 +16,6 @@ function Details({ label, value }: { label: string; value: string | number | nul
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const theme = useMantineTheme();
   const productId = id ? parseInt(id, 10) : NaN;
 
   const { data: product, isLoading: productLoading } = useQuery({
@@ -54,7 +39,7 @@ export default function ProductDetailPage() {
   if (productLoading || !product) {
     return (
       <Box py="xl" style={{ display: "flex", justifyContent: "center" }}>
-        <Loader size="md" />
+        <Loader size="md" type="dots" color="primary" />
       </Box>
     );
   }
@@ -67,9 +52,10 @@ export default function ProductDetailPage() {
     <Stack gap="xl" p="xs">
       <Button
         variant="subtle"
-        leftSection={<IconArrowLeft size={16} />}
+        leftSection={<IconArrowLeft size={18} />}
         onClick={() => navigate("/products")}
         style={{ alignSelf: "flex-start" }}
+        radius="md"
       >
         Back
       </Button>
@@ -77,49 +63,29 @@ export default function ProductDetailPage() {
       <Paper
         p="lg"
         radius="lg"
-        shadow="sm"
-        style={{ backgroundColor: theme.colors.primary?.[0] ?? theme.colors.blue[0] }}
+        style={{
+          background: "linear-gradient(135deg, var(--mantine-color-primary-0) 0%, var(--mantine-color-primary-1) 100%)",
+          border: "1px solid var(--mantine-color-primary-2)",
+          boxShadow: "0 4px 16px rgba(79,70,229,.1)",
+        }}
       >
         <Stack gap="lg">
           <Group justify="space-between" align="flex-end">
-            <Group gap="xs">
-              <ActionIcon variant="subtle" radius="md" size="md" aria-label="Edit product">
-                <IconPencil size={16} />
-              </ActionIcon>
-              <Title order={3} c={theme.colors.primary?.[9] ?? theme.colors.blue[9]}>
-                {product.name}
-              </Title>
-              {isLow && <Badge color="red" variant="light" size="sm">Low stock</Badge>}
+            <Group gap="sm">
+              <ActionIcon variant="subtle" radius="md" size="md" aria-label="Edit product"><IconPencil size={16} /></ActionIcon>
+              <Title order={3} c="var(--mantine-color-primary-8)" fw={700}>{product.name}</Title>
+              {isLow && <Badge color="red" variant="light" size="sm" radius="sm">Low stock</Badge>}
             </Group>
             <Group>
-              <Button
-                variant="light"
-                size="sm"
-                onClick={() => window.open(`/products/${id}/stock-card`, "_blank")}
-              >
-                Stock Card
-              </Button>
-              <Button
-                variant="light"
-                size="sm"
-                onClick={() => window.open(`/products/${id}/bin-card`, "_blank")}
-              >
-                Bin Card
-              </Button>
+              <Button variant="light" size="sm" radius="md" onClick={() => window.open(`/products/${id}/stock-card`, "_blank")}>Stock Card</Button>
+              <Button variant="light" size="sm" radius="md" onClick={() => window.open(`/products/${id}/bin-card`, "_blank")}>Bin Card</Button>
             </Group>
           </Group>
-          {product.description && (
-            <Box>
-              <Details label="Description" value={product.description} />
-            </Box>
-          )}
+          {product.description && <Box><Details label="Description" value={product.description} /></Box>}
           <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }} spacing="md">
             <Details label="Product Code" value={product.product_code} />
             <Details label="Category" value={product.category?.name} />
-            <Details
-              label="On-hand Quantity"
-              value={availableQty != null && product.unit?.name ? `${availableQty} ${product.unit.name}` : null}
-            />
+            <Details label="On-hand Quantity" value={availableQty != null && product.unit?.name ? `${availableQty} ${product.unit.name}` : null} />
             <Details label="Critical Level" value={criticalLevel} />
             <Details label="Fund Cluster" value={product.fund_cluster?.name} />
             <Details label="Unit" value={product.unit?.name} />
@@ -128,16 +94,14 @@ export default function ProductDetailPage() {
       </Paper>
 
       <div>
-        <Title order={4} mb={4}>Stocks</Title>
-        <Text size="sm" c="dimmed">Stock batches and running balance</Text>
+        <Title order={4} mb={4} fw={600}>Stocks</Title>
+        <Text size="sm" c="dimmed" fw={500}>Stock batches and running balance</Text>
       </div>
-      <Paper withBorder radius="lg" style={{ boxShadow: "0 1px 3px rgba(15,23,42,0.04)" }}>
+      <Paper withBorder radius="lg" style={{ boxShadow: "0 4px 16px rgba(0,0,0,.06)" }}>
         {stocksLoading ? (
-          <Box p="xl" style={{ display: "flex", justifyContent: "center" }}>
-            <Loader size="sm" />
-          </Box>
+          <Box p="xl" style={{ display: "flex", justifyContent: "center" }}><Loader size="sm" type="dots" /></Box>
         ) : stocks.length === 0 ? (
-          <Text p="lg" c="dimmed">No stock records.</Text>
+          <Text p="lg" c="dimmed" fw={500}>No stock records.</Text>
         ) : (
           <Table striped highlightOnHover withTableBorder>
             <Table.Thead>

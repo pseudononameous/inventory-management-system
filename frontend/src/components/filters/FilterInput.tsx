@@ -11,22 +11,17 @@ interface FilterInputProps {
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
 }
 
-export default function FilterInput({
-  name,
-  value,
-  placeholder,
-  onChange,
-  type = "text",
-}: FilterInputProps) {
+export default function FilterInput({ name, value, placeholder, onChange, type = "text" }: FilterInputProps) {
   return (
     <Input
       size="xs"
+      radius="sm"
       type={type}
       name={name}
       value={value ?? ""}
       placeholder={placeholder}
       onChange={onChange}
-      styles={{ input: { fontWeight: 400 } }}
+      styles={{ input: { fontWeight: 400, borderColor: "var(--mantine-color-gray-3)" } }}
     />
   );
 }

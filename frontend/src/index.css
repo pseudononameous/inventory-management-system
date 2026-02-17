@@ -2,12 +2,16 @@
   font-family: "Onest", -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #374151;
-  background-color: #f3f4f6;
+  color: #1e293b;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-surface-solid: #ffffff;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 *,
@@ -24,10 +28,11 @@ body {
 
 a {
   font-weight: 500;
-  color: #2563eb;
+  color: #4f46e5;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 a:hover {
-  color: #1d4ed8;
+  color: #4338ca;
 }

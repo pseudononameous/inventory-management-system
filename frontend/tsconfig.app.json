@@ -32,10 +32,18 @@
       "@constants/*": [
         "src/constants/*"
       ],
-      "@api": ["src/api"],
-      "@api/*": ["src/api/*"],
-      "@app-types/*": ["src/types/*"],
-      "@schemas/*": ["src/schemas/*"]
+      "@api": [
+        "src/api"
+      ],
+      "@api/*": [
+        "src/api/*"
+      ],
+      "@app-types/*": [
+        "src/types/*"
+      ],
+      "@schemas/*": [
+        "src/schemas/*"
+      ]
     },
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2022",

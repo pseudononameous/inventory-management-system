@@ -3,12 +3,11 @@ import { IconDatabaseOff } from "@tabler/icons-react";
 
 export default function NoRecordsFound() {
   return (
-    <Flex mih={100} gap="md" justify="center" align="center" direction="column" wrap="wrap">
+    <Flex mih={140} gap="md" justify="center" align="center" direction="column">
       <Stack align="center" py="xl">
-        <IconDatabaseOff size={50} style={{ opacity: 0.5 }} />
-        <Text size="lg" c="dimmed" fw={700}>
-          No records found
-        </Text>
+        <IconDatabaseOff size={48} style={{ opacity: 0.4, color: "var(--mantine-color-gray-5)" }} />
+        <Text size="md" c="dimmed" fw={600}>No records found</Text>
+        <Text size="xs" c="dimmed">Try adjusting your filters or add a new record</Text>
       </Stack>
     </Flex>
   );

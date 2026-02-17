@@ -1,15 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Stack, ActionIcon, Tooltip } from "@mantine/core";
-import {
-  IconBuilding,
-  IconBuildingStore,
-  IconTags,
-  IconCategory,
-  IconBadge,
-  IconScaleOutline,
-  IconChartPie,
-  IconSitemap,
-} from "@tabler/icons-react";
+import { IconBuilding, IconBuildingStore, IconTags, IconCategory, IconBadge, IconScaleOutline, IconChartPie, IconSitemap } from "@tabler/icons-react";
 
 const items = [
   { label: "Departments", to: "/libraries/departments", Icon: IconBuilding },
@@ -24,19 +15,20 @@ const items = [
 
 export default function RightSideNav() {
   const location = useLocation();
-
   return (
-    <Stack align="center" gap="xs">
+    <Stack align="center" gap={6}>
       {items.map(({ label, to, Icon }) => {
         const isActive = location.pathname === to;
         return (
-          <Tooltip key={to} label={label} position="left" offset={8}>
+          <Tooltip key={to} label={label} position="left" offset={10}>
             <ActionIcon
-              variant="subtle"
-              size={30}
+              variant={isActive ? "filled" : "light"}
+              size={34}
+              radius="md"
               component={NavLink}
               to={to}
-              color={isActive ? "primary" : "dark"}
+              color={isActive ? "primary" : "gray"}
+              style={{ transition: "all 0.15s ease" }}
             >
               <Icon size={18} />
             </ActionIcon>
